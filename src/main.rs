@@ -4,6 +4,9 @@
 //!   lex <FILE>              Tokenize a file
 //!   lex --code "<CODE>"     Tokenize inline code
 //!   lex --help              Show help
+//!   lex --version           Show version
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 use lex::{DefaultLanguage, Lexer, Token, TokenKind};
 use std::env;
@@ -27,6 +30,10 @@ fn main() {
         match args[i].as_str() {
             "--help" | "-h" => {
                 print_usage(&args[0]);
+                process::exit(0);
+            }
+            "--version" | "-V" => {
+                println!("lex {}", VERSION);
                 process::exit(0);
             }
             "--verbose" | "-v" => {
@@ -118,6 +125,7 @@ fn print_usage(program: &str) {
     eprintln!("  -o, --output <FMT>   Output format: pretty, json, debug (default: pretty)");
     eprintln!("  -v, --verbose        Show detailed position information");
     eprintln!("  -h, --help           Show this help message");
+    eprintln!("  -V, --version        Show version information");
     eprintln!();
     eprintln!("Examples:");
     eprintln!("  {} program.rs", program);
