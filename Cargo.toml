@@ -1,0 +1,19 @@
+[package]
+name = "lex"
+version = "0.1.0"
+edition = "2021"
+description = "A lexer/tokenizer built from scratch in Rust"
+license = "MIT"
+
+[[bin]]
+name = "lex"
+path = "src/main.rs"
+
+[lib]
+name = "lex"
+path = "src/lib.rs"
+
+[dependencies]
+# No external dependencies for core lexing
+
+[dev-dependencies]
