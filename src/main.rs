@@ -3,6 +3,8 @@
 //! Usage:
 //!   lex <FILE>              Tokenize a file
 //!   lex --code "<CODE>"     Tokenize inline code
+//!   lex -                   Read from stdin
+//!   cat file | lex          Pipe input to stdin
 //!   lex --help              Show help
 //!   lex --version           Show version
 
@@ -11,19 +13,16 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 use lex::{DefaultLanguage, Lexer, Token, TokenKind};
 use std::env;
 use std::fs;
+use std::io::{self, IsTerminal, Read};
 use std::process;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    if args.len() < 2 {
-        print_usage(&args[0]);
-        process::exit(1);
-    }
-
     let mut source = String::new();
     let mut verbose = false;
     let mut output_format = OutputFormat::Pretty;
+    let mut read_stdin = false;
     let mut i = 1;
 
     while i < args.len() {
@@ -65,6 +64,10 @@ fn main() {
                 source = args[i + 1].clone();
                 i += 2;
             }
+            "-" => {
+                read_stdin = true;
+                i += 1;
+            }
             arg if arg.starts_with('-') => {
                 eprintln!("Error: unknown option '{}'", arg);
                 print_usage(&args[0]);
@@ -80,6 +83,14 @@ fn main() {
                 }
                 i += 1;
             }
+        }
+    }
+
+    // Read from stdin if explicitly requested or if stdin is piped and no other input
+    if read_stdin || (source.is_empty() && !io::stdin().is_terminal()) {
+        if let Err(e) = io::stdin().read_to_string(&mut source) {
+            eprintln!("Error reading from stdin: {}", e);
+            process::exit(1);
         }
     }
 
@@ -118,7 +129,9 @@ enum OutputFormat {
 
 fn print_usage(program: &str) {
     eprintln!("Usage: {} [OPTIONS] <FILE>", program);
+    eprintln!("       {} [OPTIONS] -", program);
     eprintln!("       {} --code \"<CODE>\"", program);
+    eprintln!("       cat <FILE> | {}", program);
     eprintln!();
     eprintln!("Options:");
     eprintln!("  -c, --code <CODE>    Tokenize inline code");
@@ -127,10 +140,17 @@ fn print_usage(program: &str) {
     eprintln!("  -h, --help           Show this help message");
     eprintln!("  -V, --version        Show version information");
     eprintln!();
+    eprintln!("Input:");
+    eprintln!("  <FILE>               Read source code from file");
+    eprintln!("  -                    Read source code from stdin");
+    eprintln!("  (piped input)        Automatically detected when stdin is not a terminal");
+    eprintln!();
     eprintln!("Examples:");
     eprintln!("  {} program.rs", program);
     eprintln!("  {} --code \"let x = 42;\"", program);
     eprintln!("  {} --output json program.rs", program);
+    eprintln!("  echo \"let x = 42;\" | {}", program);
+    eprintln!("  cat program.rs | {} -o json", program);
 }
 
 fn print_pretty(tokens: &[Token], source: &str, verbose: bool) {
