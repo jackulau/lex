@@ -51,7 +51,7 @@ pub mod token;
 pub mod unicode;
 
 // Re-export commonly used types
-pub use error::{LexError, LexErrorKind};
+pub use error::{format_error_with_source, LexError, LexErrorKind};
 pub use language::{DefaultLanguage, LanguageBuilder, LanguageSpec};
 pub use lexer::Lexer;
 pub use source::Source;

@@ -10,7 +10,7 @@
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-use lex::{DefaultLanguage, Lexer, Token, TokenKind};
+use lex::{format_error_with_source, DefaultLanguage, Lexer, Token, TokenKind};
 use std::env;
 use std::fs;
 use std::io::{self, IsTerminal, Read};
@@ -110,11 +110,11 @@ fn main() {
         OutputFormat::Debug => print_debug(&tokens),
     }
 
-    // Report errors
+    // Report errors with source snippets
     if !errors.is_empty() {
-        eprintln!("\n--- Errors ---");
+        eprintln!();
         for error in &errors {
-            eprintln!("  {}", error);
+            eprint!("{}", format_error_with_source(error, &source));
         }
         process::exit(1);
     }
