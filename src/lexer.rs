@@ -856,4 +856,200 @@ mod tests {
         assert!(errors.is_empty());
         assert!(!tokens.is_empty());
     }
+
+    // =========================================================================
+    // Error Recovery Tests
+    // =========================================================================
+    // The lexer should continue after encountering errors to report multiple
+    // issues in a single pass.
+
+    #[test]
+    fn test_error_recovery_multiple_unterminated_strings() {
+        // Two unterminated strings on separate lines - both should be reported
+        let source = "let a = \"bad1\nlet b = \"bad2\nlet c = 42;";
+        let (tokens, errors) = Lexer::tokenize(source, DefaultLanguage);
+
+        // Should report both errors
+        assert_eq!(errors.len(), 2);
+        assert!(errors
+            .iter()
+            .all(|e| e.kind == LexErrorKind::NewlineInString));
+
+        // Should continue lexing and find remaining valid tokens
+        let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
+        assert!(kinds.contains(&&TokenKind::IntLiteral));
+    }
+
+    #[test]
+    fn test_error_recovery_multiple_invalid_numbers() {
+        // Multiple invalid number literals
+        let source = "let x = 0x; let y = 0b; let z = 0o;";
+        let (tokens, errors) = Lexer::tokenize(source, DefaultLanguage);
+
+        // Should report all three errors
+        assert_eq!(errors.len(), 3);
+        assert!(errors
+            .iter()
+            .all(|e| matches!(e.kind, LexErrorKind::InvalidNumber(_))));
+
+        // Should tokenize the rest correctly
+        let keywords: Vec<_> = tokens
+            .iter()
+            .filter(|t| matches!(t.kind, TokenKind::Keyword(_)))
+            .collect();
+        assert_eq!(keywords.len(), 3); // three 'let' keywords
+    }
+
+    #[test]
+    fn test_error_recovery_multiple_escape_errors_in_string() {
+        // Multiple invalid escapes within the same string
+        let source = r#""test \q more \z end""#;
+        let (tokens, errors) = Lexer::tokenize(source, DefaultLanguage);
+
+        // Should report both invalid escape errors
+        assert_eq!(errors.len(), 2);
+        assert!(matches!(errors[0].kind, LexErrorKind::InvalidEscape('q')));
+        assert!(matches!(errors[1].kind, LexErrorKind::InvalidEscape('z')));
+
+        // The string should still be tokenized (with errors noted)
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].kind, TokenKind::StringLiteral);
+    }
+
+    #[test]
+    fn test_error_recovery_unexpected_characters() {
+        // Multiple unexpected characters
+        let source = "let a = @ let b = $ let c = 42;";
+        let (tokens, errors) = Lexer::tokenize(source, DefaultLanguage);
+
+        // Should report both unexpected character errors
+        assert_eq!(errors.len(), 2);
+        assert!(matches!(errors[0].kind, LexErrorKind::UnexpectedChar('@')));
+        assert!(matches!(errors[1].kind, LexErrorKind::UnexpectedChar('$')));
+
+        // Should continue and find valid tokens
+        let keywords: Vec<_> = tokens
+            .iter()
+            .filter(|t| matches!(t.kind, TokenKind::Keyword(_)))
+            .collect();
+        assert_eq!(keywords.len(), 3);
+    }
+
+    #[test]
+    fn test_error_recovery_mixed_errors() {
+        // Mix of different error types
+        let source = "let a = \"unterminated\nlet b = 0x; let c = @; let d = '';";
+        let (tokens, errors) = Lexer::tokenize(source, DefaultLanguage);
+
+        // Should report all four errors
+        assert_eq!(errors.len(), 4);
+
+        // Verify error types
+        assert!(matches!(errors[0].kind, LexErrorKind::NewlineInString));
+        assert!(matches!(errors[1].kind, LexErrorKind::InvalidNumber(_)));
+        assert!(matches!(errors[2].kind, LexErrorKind::UnexpectedChar('@')));
+        assert!(matches!(errors[3].kind, LexErrorKind::EmptyCharLiteral));
+
+        // Should continue lexing and find valid tokens
+        let keywords: Vec<_> = tokens
+            .iter()
+            .filter(|t| matches!(t.kind, TokenKind::Keyword(_)))
+            .collect();
+        assert_eq!(keywords.len(), 4); // four 'let' keywords
+    }
+
+    #[test]
+    fn test_error_recovery_char_literal_errors() {
+        // Various character literal errors
+        let source = "let a = ''; let b = 'ab'; let c = 'x';";
+        let (tokens, errors) = Lexer::tokenize(source, DefaultLanguage);
+
+        // Should report empty and multi-char errors
+        assert_eq!(errors.len(), 2);
+        assert!(matches!(errors[0].kind, LexErrorKind::EmptyCharLiteral));
+        assert!(matches!(errors[1].kind, LexErrorKind::MultiCharLiteral));
+
+        // Valid char literal should still be recognized
+        let char_literals: Vec<_> = tokens
+            .iter()
+            .filter(|t| t.kind == TokenKind::CharLiteral)
+            .collect();
+        assert_eq!(char_literals.len(), 1);
+    }
+
+    #[test]
+    fn test_error_recovery_unicode_escape_errors() {
+        // Invalid unicode escapes
+        let source = r#"let a = "\u{"; let b = "\u12"; let c = "ok";"#;
+        let (tokens, errors) = Lexer::tokenize(source, DefaultLanguage);
+
+        // Should report both unicode escape errors
+        assert_eq!(errors.len(), 2);
+        assert!(errors
+            .iter()
+            .all(|e| matches!(e.kind, LexErrorKind::InvalidUnicodeEscape(_))));
+
+        // Should still find the valid string
+        let strings: Vec<_> = tokens
+            .iter()
+            .filter(|t| t.kind == TokenKind::StringLiteral)
+            .collect();
+        assert_eq!(strings.len(), 3);
+    }
+
+    #[test]
+    fn test_error_recovery_continues_after_eof_in_comment() {
+        // Unterminated comment consumes rest of input
+        let source = "let x = 42; /* unterminated";
+        let (tokens, errors) = Lexer::tokenize(source, DefaultLanguage);
+
+        // Should report unterminated comment
+        assert_eq!(errors.len(), 1);
+        assert!(matches!(errors[0].kind, LexErrorKind::UnterminatedComment));
+
+        // Tokens before the comment should be captured
+        let kinds: Vec<_> = tokens.iter().map(|t| &t.kind).collect();
+        assert!(kinds.contains(&&TokenKind::IntLiteral));
+    }
+
+    #[test]
+    fn test_error_recovery_preserves_positions() {
+        // Errors should have correct positions even after recovery
+        let source = "@ $ %";
+        let (tokens, errors) = Lexer::tokenize(source, DefaultLanguage);
+
+        // First error at column 1, second at column 3
+        assert_eq!(errors.len(), 2);
+        assert_eq!(errors[0].span.start_loc.column, 1);
+        assert_eq!(errors[1].span.start_loc.column, 3);
+
+        // % is a valid operator
+        assert_eq!(tokens.len(), 3); // @ (error), $ (error), % (percent)
+        assert_eq!(tokens[2].kind, TokenKind::Percent);
+        assert_eq!(tokens[2].span.start_loc.column, 5);
+    }
+
+    #[test]
+    fn test_error_recovery_complex_program_with_errors() {
+        // A more realistic program with multiple errors
+        let source = r#"
+            fn calculate(x) {
+                let result = 0x;        // invalid number
+                let name = "unterminated
+                let value = @;          // unexpected char
+                return result + value;
+            }
+        "#;
+        let (tokens, errors) = Lexer::tokenize(source, DefaultLanguage);
+
+        // Should report multiple errors
+        assert!(errors.len() >= 3);
+
+        // Should still recognize the overall program structure
+        let keywords: Vec<_> = tokens
+            .iter()
+            .filter(|t| matches!(t.kind, TokenKind::Keyword(_)))
+            .collect();
+        assert!(keywords.len() >= 4); // fn, let, let, return at minimum
+    }
 }
