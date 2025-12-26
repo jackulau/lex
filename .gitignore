@@ -18,3 +18,8 @@ Thumbs.db
 
 # Debug files
 *.pdb
+
+# Fuzz testing
+fuzz/target/
+fuzz/artifacts/
+fuzz/corpus/

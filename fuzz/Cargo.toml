@@ -1,0 +1,55 @@
+[package]
+name = "lex-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+
+[dependencies.lex]
+path = ".."
+
+# Main lexer fuzz target - tests arbitrary UTF-8 input
+[[bin]]
+name = "fuzz_lexer"
+path = "fuzz_targets/fuzz_lexer.rs"
+test = false
+doc = false
+bench = false
+
+# String literal parsing - focuses on escape sequences
+[[bin]]
+name = "fuzz_strings"
+path = "fuzz_targets/fuzz_strings.rs"
+test = false
+doc = false
+bench = false
+
+# Number parsing - all numeric formats
+[[bin]]
+name = "fuzz_numbers"
+path = "fuzz_targets/fuzz_numbers.rs"
+test = false
+doc = false
+bench = false
+
+# Comment parsing - nested and edge cases
+[[bin]]
+name = "fuzz_comments"
+path = "fuzz_targets/fuzz_comments.rs"
+test = false
+doc = false
+bench = false
+
+# Custom language configurations
+[[bin]]
+name = "fuzz_language"
+path = "fuzz_targets/fuzz_language.rs"
+test = false
+doc = false
+bench = false
