@@ -100,6 +100,11 @@ impl<'a, L: LanguageSpec> Lexer<'a, L> {
             return token;
         }
 
+        // Check for raw string prefix (e.g., r"...")
+        if let Some(kind) = self.try_scan_raw_string(start, start_loc) {
+            return self.make_token(kind, start, start_loc);
+        }
+
         // State-based recognition using first character
         let kind = match c {
             // Identifiers and keywords
@@ -172,6 +177,30 @@ impl<'a, L: LanguageSpec> Lexer<'a, L> {
         }
 
         None
+    }
+
+    /// Try to scan a raw string literal.
+    fn try_scan_raw_string(&mut self, start: usize, start_loc: Location) -> Option<TokenKind> {
+        let config = self.language.string_config();
+        let prefix = config.raw_prefix?;
+
+        if !self.source.starts_with(prefix) {
+            return None;
+        }
+
+        // Check if the character after the prefix is a string delimiter
+        let prefix_len = prefix.len();
+        let next_char = self.source.peek_nth(prefix_len)?;
+
+        if !config.delimiters.contains(&next_char) {
+            return None;
+        }
+
+        // Consume the prefix
+        self.source.consume(prefix);
+
+        // Scan the raw string (delimiter is the next character)
+        Some(self.scan_raw_string(next_char, start, start_loc))
     }
 
     /// Scan a single-line comment.
@@ -410,6 +439,35 @@ impl<'a, L: LanguageSpec> Lexer<'a, L> {
         TokenKind::StringLiteral
     }
 
+    /// Scan a raw string literal (no escape sequence processing).
+    fn scan_raw_string(&mut self, delimiter: char, start: usize, start_loc: Location) -> TokenKind {
+        self.source.advance(); // consume opening delimiter
+
+        loop {
+            match self.source.peek() {
+                None => {
+                    let span = self.source.span_from(start, start_loc);
+                    self.report_error(LexErrorKind::UnterminatedString, span);
+                    return TokenKind::Error;
+                }
+                Some(c) if c == delimiter => {
+                    self.source.advance();
+                    break;
+                }
+                Some('\n') if !self.language.string_config().multiline => {
+                    let span = self.source.span_from(start, start_loc);
+                    self.report_error(LexErrorKind::NewlineInString, span);
+                    return TokenKind::Error;
+                }
+                _ => {
+                    self.source.advance();
+                }
+            }
+        }
+
+        TokenKind::RawStringLiteral
+    }
+
     /// Scan a character literal.
     fn scan_char(&mut self) -> TokenKind {
         let (start, start_loc) = self.source.save();
@@ -643,6 +701,38 @@ mod tests {
     fn test_string_escape_sequences() {
         let kinds = token_kinds(r#""hello\nworld" "\t\r\\" "\u{1F600}""#);
         assert!(kinds.iter().all(|k| *k == TokenKind::StringLiteral));
+    }
+
+    #[test]
+    fn test_raw_string_literals() {
+        let kinds = token_kinds(r#"r"hello" r"world""#);
+        assert!(kinds.iter().all(|k| *k == TokenKind::RawStringLiteral));
+    }
+
+    #[test]
+    fn test_raw_string_no_escape_processing() {
+        // Raw strings should not process escape sequences
+        let source = r#"r"hello\nworld""#;
+        let (tokens, errors) = Lexer::tokenize(source, DefaultLanguage);
+        assert!(errors.is_empty(), "raw strings should not report escape errors");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].kind, TokenKind::RawStringLiteral);
+    }
+
+    #[test]
+    fn test_raw_string_with_backslashes() {
+        // Raw strings should preserve backslashes without treating them as escapes
+        let source = r#"r"C:\Users\test""#;
+        let (tokens, errors) = Lexer::tokenize(source, DefaultLanguage);
+        assert!(errors.is_empty());
+        assert_eq!(tokens[0].kind, TokenKind::RawStringLiteral);
+    }
+
+    #[test]
+    fn test_r_identifier_not_followed_by_quote() {
+        // 'r' alone or followed by non-quote should be identifier
+        let kinds = token_kinds("r rx r123");
+        assert!(kinds.iter().all(|k| *k == TokenKind::Ident));
     }
 
     #[test]

@@ -70,7 +70,7 @@ impl LanguageSpec for DefaultLanguage {
         static CONFIG: StringConfig = StringConfig {
             delimiters: &['"'],
             multiline: false,
-            raw_prefix: None,
+            raw_prefix: Some("r"),
         };
         &CONFIG
     }

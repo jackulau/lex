@@ -60,6 +60,8 @@ pub enum TokenKind {
     FloatLiteral,
     /// String literal.
     StringLiteral,
+    /// Raw string literal (no escape processing).
+    RawStringLiteral,
     /// Character literal.
     CharLiteral,
     /// Boolean literal.
@@ -174,6 +176,7 @@ impl TokenKind {
             TokenKind::IntLiteral
                 | TokenKind::FloatLiteral
                 | TokenKind::StringLiteral
+                | TokenKind::RawStringLiteral
                 | TokenKind::CharLiteral
                 | TokenKind::BoolLiteral(_)
         )
@@ -246,6 +249,7 @@ impl fmt::Display for TokenKind {
             TokenKind::IntLiteral => write!(f, "IntLiteral"),
             TokenKind::FloatLiteral => write!(f, "FloatLiteral"),
             TokenKind::StringLiteral => write!(f, "StringLiteral"),
+            TokenKind::RawStringLiteral => write!(f, "RawStringLiteral"),
             TokenKind::CharLiteral => write!(f, "CharLiteral"),
             TokenKind::BoolLiteral(b) => write!(f, "BoolLiteral({})", b),
             TokenKind::Plus => write!(f, "+"),
