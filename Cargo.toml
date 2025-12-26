@@ -17,3 +17,8 @@ path = "src/lib.rs"
 # No external dependencies for core lexing
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "lexer_benchmarks"
+harness = false
