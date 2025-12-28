@@ -3,7 +3,10 @@
 //! This module defines error types for lexical analysis failures.
 
 use crate::span::{Location, Span};
-use std::fmt;
+use core::fmt;
+
+#[cfg(all(feature = "alloc", not(feature = "std")))]
+use alloc::string::String;
 
 /// A lexical analysis error.
 #[derive(Debug, Clone, PartialEq)]
@@ -77,6 +80,7 @@ impl fmt::Display for LexError {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for LexError {}
 
 /// Format an error with source snippet for display.
@@ -92,7 +96,12 @@ impl std::error::Error for LexError {}
 ///  1 | let @x = 42;
 ///    |     ^
 /// ```
+///
+/// This function requires the `alloc` feature.
+#[cfg(feature = "alloc")]
 pub fn format_error_with_source(error: &LexError, source: &str) -> String {
+    use alloc::format;
+    use alloc::string::ToString;
     let mut output = String::new();
     let loc = error.span.start_loc;
     let line_num = loc.line as usize;
@@ -138,6 +147,7 @@ pub fn format_error_with_source(error: &LexError, source: &str) -> String {
 }
 
 /// Calculate the visual column position accounting for tabs.
+#[cfg(feature = "alloc")]
 fn calculate_visual_column(line: &str, column: usize) -> usize {
     let mut visual_col = 1;
     for (i, c) in line.chars().enumerate() {
@@ -155,6 +165,7 @@ fn calculate_visual_column(line: &str, column: usize) -> usize {
 }
 
 /// Calculate the underline length based on error span.
+#[cfg(feature = "alloc")]
 fn calculate_underline_length(error: &LexError, source: &str) -> usize {
     // For single-line errors, use the span length
     if error.span.start_loc.line == error.span.end_loc.line {
@@ -227,6 +238,9 @@ impl fmt::Display for LexErrorKind {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(all(feature = "alloc", not(feature = "std")))]
+    use alloc::format;
 
     #[test]
     fn test_error_display() {

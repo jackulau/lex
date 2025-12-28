@@ -4,7 +4,7 @@
 //! to represent lexical tokens produced by the lexer.
 
 use crate::span::Span;
-use std::fmt;
+use core::fmt;
 
 /// A token with its kind and source location.
 #[derive(Debug, Clone, PartialEq)]
@@ -298,6 +298,9 @@ impl fmt::Display for TokenKind {
 mod tests {
     use super::*;
     use crate::span::Location;
+
+    #[cfg(all(feature = "alloc", not(feature = "std")))]
+    use alloc::format;
 
     #[test]
     fn test_token_kind_checks() {

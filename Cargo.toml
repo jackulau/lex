@@ -8,10 +8,16 @@ license = "Apache-2.0"
 [[bin]]
 name = "lex"
 path = "src/main.rs"
+required-features = ["std"]
 
 [lib]
 name = "lex"
 path = "src/lib.rs"
+
+[features]
+default = ["std"]
+std = ["alloc"]
+alloc = []
 
 [dependencies]
 # No external dependencies for core lexing

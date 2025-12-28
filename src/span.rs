@@ -3,7 +3,7 @@
 //! This module provides types for tracking positions in source code,
 //! including line/column information and byte offsets.
 
-use std::fmt;
+use core::fmt;
 
 /// A location in source code (line and column, 1-indexed).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

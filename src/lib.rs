@@ -12,6 +12,17 @@
 //! - **Position Tracking**: Precise line and column numbers for all tokens
 //! - **Pluggable Languages**: Define custom keywords, operators, and comment styles
 //! - **Zero Dependencies**: Core lexing uses only the standard library
+//! - **`no_std` Support**: Works in embedded environments with `alloc`
+//!
+//! ## `no_std` Support
+//!
+//! This crate supports `no_std` environments. By default, the `std` feature is enabled.
+//! To use in a `no_std` environment with an allocator:
+//!
+//! ```toml
+//! [dependencies]
+//! lex = { version = "0.1", default-features = false, features = ["alloc"] }
+//! ```
 //!
 //! ## Quick Start
 //!
@@ -42,6 +53,11 @@
 //! let (tokens, errors) = Lexer::tokenize("var x = 42", my_lang);
 //! ```
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
 pub mod error;
 pub mod language;
 pub mod lexer;
@@ -51,7 +67,9 @@ pub mod token;
 pub mod unicode;
 
 // Re-export commonly used types
-pub use error::{format_error_with_source, LexError, LexErrorKind};
+pub use error::{LexError, LexErrorKind};
+#[cfg(feature = "alloc")]
+pub use error::format_error_with_source;
 pub use language::{DefaultLanguage, LanguageBuilder, LanguageSpec};
 pub use lexer::Lexer;
 pub use source::Source;

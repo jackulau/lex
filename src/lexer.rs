@@ -3,6 +3,9 @@
 //! This module implements the main lexer using the Dragon Book approach:
 //! character-by-character scanning with maximal munch for operators.
 
+#[cfg(all(feature = "alloc", not(feature = "std")))]
+use alloc::vec::Vec;
+
 use crate::error::{LexError, LexErrorKind};
 use crate::language::LanguageSpec;
 use crate::source::Source;
@@ -618,6 +621,11 @@ impl<'a, L: LanguageSpec> Iterator for Lexer<'a, L> {
 mod tests {
     use super::*;
     use crate::language::DefaultLanguage;
+
+    #[cfg(all(feature = "alloc", not(feature = "std")))]
+    use alloc::vec;
+    #[cfg(all(feature = "alloc", not(feature = "std")))]
+    use alloc::vec::Vec;
 
     fn tokenize(source: &str) -> Vec<Token> {
         let (tokens, _) = Lexer::tokenize(source, DefaultLanguage);

@@ -1,5 +1,8 @@
 //! Fluent builder for creating custom language specifications.
 
+#[cfg(all(feature = "alloc", not(feature = "std")))]
+use alloc::vec::Vec;
+
 use super::{CommentStyles, LanguageSpec, OperatorDef, StringConfig};
 use crate::token::TokenKind;
 
