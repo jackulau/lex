@@ -13,6 +13,7 @@
 //! - **Pluggable Languages**: Define custom keywords, operators, and comment styles
 //! - **Zero Dependencies**: Core lexing uses only the standard library
 //! - **`no_std` Support**: Works in embedded environments with `alloc`
+//! - **WebAssembly Support**: Compile to WASM for browser-based tools
 //!
 //! ## `no_std` Support
 //!
@@ -22,6 +23,39 @@
 //! ```toml
 //! [dependencies]
 //! lex = { version = "0.1", default-features = false, features = ["alloc"] }
+//! ```
+//!
+//! ## WebAssembly Support
+//!
+//! To compile for WebAssembly:
+//!
+//! ```bash
+//! # Add WASM target and install wasm-bindgen
+//! rustup target add wasm32-unknown-unknown
+//! cargo install wasm-bindgen-cli
+//!
+//! # Build and generate bindings
+//! cargo build --target wasm32-unknown-unknown --features wasm --release
+//! wasm-bindgen target/wasm32-unknown-unknown/release/lex.wasm \
+//!     --out-dir pkg --target web
+//! ```
+//!
+//! Then use in JavaScript:
+//!
+//! ```javascript
+//! import init, { tokenize, LexerConfig, tokenizeWithConfig } from './pkg/lex.js';
+//!
+//! await init();
+//!
+//! // Tokenize with default language
+//! const result = JSON.parse(tokenize('let x = 42;'));
+//! console.log(result.tokens);
+//!
+//! // Custom language configuration
+//! const config = new LexerConfig();
+//! config.addKeyword('func');
+//! config.setSingleLineComment('#');
+//! const customResult = JSON.parse(tokenizeWithConfig('func main() {}', config));
 //! ```
 //!
 //! ## Quick Start
@@ -65,6 +99,9 @@ pub mod source;
 pub mod span;
 pub mod token;
 pub mod unicode;
+
+#[cfg(feature = "wasm")]
+pub mod wasm;
 
 // Re-export commonly used types
 pub use error::{LexError, LexErrorKind};

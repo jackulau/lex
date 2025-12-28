@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lex - WebAssembly Tokenizer Demo</title>
+    <style>
+        :root {
+            --bg-color: #1e1e2e;
+            --surface-color: #313244;
+            --text-color: #cdd6f4;
+            --accent-color: #89b4fa;
+            --success-color: #a6e3a1;
+            --error-color: #f38ba8;
+            --border-color: #45475a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: var(--accent-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: #6c7086;
+            margin-bottom: 2rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background-color: var(--surface-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .panel h2 {
+            color: var(--accent-color);
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 14px;
+            resize: vertical;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .output {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 1rem;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow: auto;
+        }
+
+        .token {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.5rem;
+            margin: 0.25rem;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .token-kind {
+            font-weight: 600;
+            padding: 0.125rem 0.375rem;
+            border-radius: 3px;
+            font-size: 10px;
+        }
+
+        .token-lexeme {
+            color: var(--text-color);
+        }
+
+        .token-Keyword { background-color: rgba(203, 166, 247, 0.2); }
+        .token-Keyword .token-kind { background-color: #cba6f7; color: #1e1e2e; }
+
+        .token-Ident { background-color: rgba(137, 180, 250, 0.2); }
+        .token-Ident .token-kind { background-color: #89b4fa; color: #1e1e2e; }
+
+        .token-IntLiteral, .token-FloatLiteral { background-color: rgba(250, 179, 135, 0.2); }
+        .token-IntLiteral .token-kind, .token-FloatLiteral .token-kind { background-color: #fab387; color: #1e1e2e; }
+
+        .token-StringLiteral, .token-CharLiteral, .token-RawStringLiteral { background-color: rgba(166, 227, 161, 0.2); }
+        .token-StringLiteral .token-kind, .token-CharLiteral .token-kind, .token-RawStringLiteral .token-kind { background-color: #a6e3a1; color: #1e1e2e; }
+
+        .token-BoolLiteral { background-color: rgba(245, 194, 231, 0.2); }
+        .token-BoolLiteral .token-kind { background-color: #f5c2e7; color: #1e1e2e; }
+
+        .token-Comment { background-color: rgba(108, 112, 134, 0.2); }
+        .token-Comment .token-kind { background-color: #6c7086; color: #1e1e2e; }
+
+        .token-Error { background-color: rgba(243, 139, 168, 0.2); }
+        .token-Error .token-kind { background-color: #f38ba8; color: #1e1e2e; }
+
+        .token-operator { background-color: rgba(148, 226, 213, 0.2); }
+        .token-operator .token-kind { background-color: #94e2d5; color: #1e1e2e; }
+
+        .token-delimiter { background-color: rgba(249, 226, 175, 0.2); }
+        .token-delimiter .token-kind { background-color: #f9e2af; color: #1e1e2e; }
+
+        .error-list {
+            margin-top: 1rem;
+        }
+
+        .error-item {
+            background-color: rgba(243, 139, 168, 0.1);
+            border-left: 3px solid var(--error-color);
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .error-message {
+            color: var(--error-color);
+            font-weight: 500;
+        }
+
+        .error-location {
+            color: #6c7086;
+            font-size: 12px;
+            margin-top: 0.25rem;
+        }
+
+        .stats {
+            display: flex;
+            gap: 1.5rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--accent-color);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: #6c7086;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-dot.success { background-color: var(--success-color); }
+        .status-dot.error { background-color: var(--error-color); }
+        .status-dot.loading { background-color: var(--accent-color); animation: pulse 1s infinite; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(30, 30, 46, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .loading-text {
+            color: var(--accent-color);
+            font-size: 1.25rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .json-view {
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .tab {
+            padding: 0.5rem 1rem;
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            border-radius: 4px;
+            font-size: 0.875rem;
+        }
+
+        .tab.active {
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+            border-color: var(--accent-color);
+        }
+
+        .version {
+            color: #6c7086;
+            font-size: 0.75rem;
+            margin-top: 2rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading" class="loading-overlay">
+        <div class="loading-text">Loading WASM module...</div>
+    </div>
+
+    <div class="container">
+        <h1>Lex</h1>
+        <p class="subtitle">WebAssembly-powered lexical analyzer</p>
+
+        <div class="grid">
+            <div class="panel">
+                <h2>Source Code</h2>
+                <textarea id="source" placeholder="Enter source code here...">fn main() {
+    let x = 42;
+    let name = "hello";
+    if x > 10 {
+        println!("large");
+    }
+}</textarea>
+                <div class="controls">
+                    <button id="tokenize-btn" onclick="runTokenize()">Tokenize</button>
+                    <button onclick="loadExample('rust')">Rust Example</button>
+                    <button onclick="loadExample('python')">Python Example</button>
+                    <button onclick="loadExample('js')">JS Example</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Results</h2>
+                <div class="tabs">
+                    <button class="tab active" onclick="showTab('visual')">Visual</button>
+                    <button class="tab" onclick="showTab('json')">JSON</button>
+                </div>
+                <div id="output-visual" class="output"></div>
+                <div id="output-json" class="output json-view hidden"></div>
+                <div id="errors" class="error-list"></div>
+                <div class="stats">
+                    <div class="stat">
+                        <span id="token-count" class="stat-value">0</span>
+                        <span class="stat-label">Tokens</span>
+                    </div>
+                    <div class="stat">
+                        <span id="error-count" class="stat-value">0</span>
+                        <span class="stat-label">Errors</span>
+                    </div>
+                    <div class="stat">
+                        <span id="time" class="stat-value">0ms</span>
+                        <span class="stat-label">Time</span>
+                    </div>
+                </div>
+                <div id="status" class="status">
+                    <div class="status-dot"></div>
+                    <span>Ready</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="version" class="version"></div>
+    </div>
+
+    <script type="module">
+        import init, { tokenize, getDefaultKeywords, getVersion } from './pkg/lex.js';
+
+        const OPERATORS = new Set([
+            'Plus', 'Minus', 'Star', 'Slash', 'Percent', 'Eq', 'EqEq', 'BangEq',
+            'Lt', 'Gt', 'LtEq', 'GtEq', 'Bang', 'AmpAmp', 'PipePipe', 'Amp',
+            'Pipe', 'Caret', 'Tilde', 'LtLt', 'GtGt'
+        ]);
+
+        const DELIMITERS = new Set([
+            'LParen', 'RParen', 'LBrace', 'RBrace', 'LBracket', 'RBracket',
+            'Semicolon', 'Comma', 'Colon', 'ColonColon', 'Dot', 'Arrow', 'FatArrow'
+        ]);
+
+        const examples = {
+            rust: `fn main() {
+    let x = 42;
+    let name = "hello";
+    if x > 10 {
+        println!("large");
+    }
+}`,
+            python: `def calculate(x, y):
+    # Perform calculation
+    result = x + y * 2
+    if result > 100:
+        return True
+    return False`,
+            js: `function greet(name) {
+    const message = "Hello, " + name;
+    if (name.length > 5) {
+        console.log(message);
+    }
+    return message;
+}`
+        };
+
+        let wasmLoaded = false;
+
+        async function initWasm() {
+            try {
+                await init();
+                wasmLoaded = true;
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('version').textContent = `Lex v${getVersion()} | WASM`;
+
+                // Show default keywords in console
+                console.log('Default keywords:', JSON.parse(getDefaultKeywords()));
+
+                // Run initial tokenization
+                runTokenize();
+            } catch (e) {
+                document.getElementById('loading').innerHTML = `
+                    <div style="text-align: center; color: #f38ba8;">
+                        <p style="font-size: 1.25rem; margin-bottom: 1rem;">Failed to load WASM module</p>
+                        <p style="font-size: 0.875rem; color: #6c7086;">${e.message}</p>
+                        <p style="font-size: 0.875rem; color: #6c7086; margin-top: 1rem;">
+                            Build with: cargo build --target wasm32-unknown-unknown --features wasm --release && wasm-bindgen ...
+                        </p>
+                    </div>
+                `;
+            }
+        }
+
+        window.runTokenize = function() {
+            if (!wasmLoaded) return;
+
+            const source = document.getElementById('source').value;
+            const startTime = performance.now();
+
+            try {
+                const resultJson = tokenize(source);
+                const endTime = performance.now();
+                const result = JSON.parse(resultJson);
+
+                renderTokens(result.tokens, source);
+                renderErrors(result.errors);
+                updateStats(result.tokens.length, result.errors.length, endTime - startTime);
+                updateStatus(result.success);
+
+                document.getElementById('output-json').textContent = JSON.stringify(result, null, 2);
+            } catch (e) {
+                console.error('Tokenization error:', e);
+                updateStatus(false, e.message);
+            }
+        };
+
+        function renderTokens(tokens, source) {
+            const container = document.getElementById('output-visual');
+            container.innerHTML = '';
+
+            tokens.forEach(token => {
+                if (token.kind === 'Eof') return;
+
+                const el = document.createElement('span');
+                let tokenClass = `token token-${token.kind}`;
+
+                if (OPERATORS.has(token.kind)) {
+                    tokenClass = 'token token-operator';
+                } else if (DELIMITERS.has(token.kind)) {
+                    tokenClass = 'token token-delimiter';
+                }
+
+                el.className = tokenClass;
+
+                const kindEl = document.createElement('span');
+                kindEl.className = 'token-kind';
+                kindEl.textContent = token.value ? `${token.kind}:${token.value}` : token.kind;
+
+                const lexemeEl = document.createElement('span');
+                lexemeEl.className = 'token-lexeme';
+                lexemeEl.textContent = token.lexeme;
+
+                el.appendChild(kindEl);
+                el.appendChild(lexemeEl);
+                container.appendChild(el);
+            });
+        }
+
+        function renderErrors(errors) {
+            const container = document.getElementById('errors');
+            container.innerHTML = '';
+
+            errors.forEach(error => {
+                const el = document.createElement('div');
+                el.className = 'error-item';
+
+                const msgEl = document.createElement('div');
+                msgEl.className = 'error-message';
+                msgEl.textContent = error.message;
+
+                const locEl = document.createElement('div');
+                locEl.className = 'error-location';
+                locEl.textContent = `at line ${error.line}, column ${error.column}`;
+
+                el.appendChild(msgEl);
+                el.appendChild(locEl);
+                container.appendChild(el);
+            });
+        }
+
+        function updateStats(tokenCount, errorCount, time) {
+            document.getElementById('token-count').textContent = tokenCount;
+            document.getElementById('error-count').textContent = errorCount;
+            document.getElementById('time').textContent = `${time.toFixed(2)}ms`;
+        }
+
+        function updateStatus(success, message) {
+            const statusEl = document.getElementById('status');
+            const dot = statusEl.querySelector('.status-dot');
+            const text = statusEl.querySelector('span');
+
+            dot.className = 'status-dot ' + (success ? 'success' : 'error');
+            text.textContent = message || (success ? 'Success' : 'Errors found');
+        }
+
+        window.loadExample = function(name) {
+            document.getElementById('source').value = examples[name] || '';
+            runTokenize();
+        };
+
+        window.showTab = function(tab) {
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.getElementById('output-visual').classList.toggle('hidden', tab !== 'visual');
+            document.getElementById('output-json').classList.toggle('hidden', tab !== 'json');
+        };
+
+        // Auto-tokenize on input with debounce
+        let debounceTimer;
+        document.getElementById('source').addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(runTokenize, 300);
+        });
+
+        initWasm();
+    </script>
+</body>
+</html>

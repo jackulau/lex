@@ -13,14 +13,20 @@ required-features = ["std"]
 [lib]
 name = "lex"
 path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["std"]
 std = ["alloc"]
 alloc = []
+wasm = ["alloc", "wasm-bindgen", "serde", "serde_json"]
 
 [dependencies]
 # No external dependencies for core lexing
+# WASM support (optional)
+wasm-bindgen = { version = "0.2", optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
