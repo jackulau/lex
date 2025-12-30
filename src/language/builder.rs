@@ -135,6 +135,7 @@ impl Default for LanguageBuilder {
 }
 
 /// A custom language specification built by `LanguageBuilder`.
+#[derive(Clone)]
 pub struct CustomLanguage {
     keywords: Vec<&'static str>,
     operators: Vec<OperatorDef>,

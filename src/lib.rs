@@ -11,6 +11,7 @@
 //! - **Unicode Support**: Full Unicode identifier support (UAX #31)
 //! - **Position Tracking**: Precise line and column numbers for all tokens
 //! - **Pluggable Languages**: Define custom keywords, operators, and comment styles
+//! - **Incremental Re-lexing**: Efficiently re-tokenize only changed regions
 //! - **Zero Dependencies**: Core lexing uses only the standard library
 //! - **`no_std` Support**: Works in embedded environments with `alloc`
 //! - **WebAssembly Support**: Compile to WASM for browser-based tools
@@ -86,6 +87,24 @@
 //!
 //! let (tokens, errors) = Lexer::tokenize("var x = 42", my_lang);
 //! ```
+//!
+//! ## Incremental Re-lexing
+//!
+//! For editor-like use cases, use `IncrementalLexer` to efficiently re-tokenize
+//! only the changed regions of source text:
+//!
+//! ```rust
+//! use lex::{IncrementalLexer, DefaultLanguage, Edit};
+//!
+//! let mut lexer = IncrementalLexer::new("let x = 42;", DefaultLanguage);
+//!
+//! // Apply an edit: change "42" to "100"
+//! let edit = Edit::new(8, 10, "100");
+//! let stats = lexer.apply_edit(edit);
+//!
+//! println!("Reused {} tokens, lexed {} new", stats.tokens_reused, stats.tokens_lexed);
+//! assert_eq!(lexer.tokens().len(), 5);
+//! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -93,6 +112,8 @@
 extern crate alloc;
 
 pub mod error;
+#[cfg(feature = "alloc")]
+pub mod incremental;
 pub mod language;
 pub mod lexer;
 pub mod source;
@@ -107,6 +128,8 @@ pub mod wasm;
 pub use error::{LexError, LexErrorKind};
 #[cfg(feature = "alloc")]
 pub use error::format_error_with_source;
+#[cfg(feature = "alloc")]
+pub use incremental::{Edit, IncrementalLexer, IncrementalStats};
 pub use language::{DefaultLanguage, LanguageBuilder, LanguageSpec};
 pub use lexer::Lexer;
 pub use source::Source;

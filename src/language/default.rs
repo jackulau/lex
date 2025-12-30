@@ -10,6 +10,7 @@ use crate::token::TokenKind;
 /// - Operators: arithmetic, comparison, logical, bitwise
 /// - Comments: // and /* */
 /// - Strings: double-quoted with escape sequences
+#[derive(Clone, Copy)]
 pub struct DefaultLanguage;
 
 impl LanguageSpec for DefaultLanguage {
