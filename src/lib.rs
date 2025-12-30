@@ -1,9 +1,10 @@
 //! # Lex
 //!
-//! A lexer/tokenizer built from scratch in Rust.
+//! A lexer/tokenizer and parser built from scratch in Rust.
 //!
 //! This library provides a flexible lexical analyzer that breaks source code
-//! into tokens. It supports full Unicode, precise position tracking, and
+//! into tokens, and a full recursive descent parser that builds Abstract Syntax
+//! Trees (ASTs). It supports full Unicode, precise position tracking, and
 //! pluggable language rules.
 //!
 //! ## Features
@@ -14,6 +15,7 @@
 //! - **Incremental Re-lexing**: Efficiently re-tokenize only changed regions
 //! - **Streaming Tokenization**: Memory-efficient processing for large inputs
 //! - **Token Caching**: LRU caching with fine-grained invalidation
+//! - **AST Parser**: Full recursive descent parser with precedence climbing
 //! - **Zero Dependencies**: Core lexing uses only the standard library
 //! - **`no_std` Support**: Works in embedded environments with `alloc`
 //! - **WebAssembly Support**: Compile to WASM for browser-based tools
@@ -146,25 +148,61 @@
 //! let stats = lexer.cache_stats();
 //! println!("Cache hit rate: {:.1}%", stats.hit_rate() * 100.0);
 //! ```
+//!
+//! ## Parsing
+//!
+//! Use the parser to build Abstract Syntax Trees from source code:
+//!
+//! ```rust
+//! use lex::parser::Parser;
+//! use lex::DefaultLanguage;
+//!
+//! let source = "fn main() { let x = 42; }";
+//! let mut parser = Parser::new(source, DefaultLanguage);
+//!
+//! match parser.parse_program() {
+//!     Ok(program) => {
+//!         println!("Parsed {} items", program.items.len());
+//!         // Access the AST nodes
+//!         for item in &program.items {
+//!             println!("{:?}", item);
+//!         }
+//!     }
+//!     Err(errors) => {
+//!         for error in errors {
+//!             eprintln!("{}", error);
+//!         }
+//!     }
+//! }
+//! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+// Core modules
 pub mod error;
-#[cfg(feature = "alloc")]
-pub mod cache;
-#[cfg(feature = "alloc")]
-pub mod incremental;
 pub mod language;
 pub mod lexer;
 pub mod source;
 pub mod span;
-#[cfg(feature = "alloc")]
-pub mod streaming;
 pub mod token;
 pub mod unicode;
+
+// AST and Parser (requires alloc for Vec, Box, String)
+#[cfg(feature = "alloc")]
+pub mod ast;
+#[cfg(feature = "alloc")]
+pub mod parser;
+
+// Advanced lexer features
+#[cfg(feature = "alloc")]
+pub mod cache;
+#[cfg(feature = "alloc")]
+pub mod incremental;
+#[cfg(feature = "alloc")]
+pub mod streaming;
 
 #[cfg(feature = "wasm")]
 pub mod wasm;
@@ -187,3 +225,31 @@ pub use streaming::{
     StreamingStats, TokenVisitor,
 };
 pub use token::{KeywordId, Token, TokenKind};
+
+// Parser re-exports
+#[cfg(feature = "alloc")]
+pub use parser::{Parser, ParseError, ParseErrorKind, ParseResult, format_parse_error};
+
+// AST re-exports
+#[cfg(feature = "alloc")]
+pub use ast::{
+    // Core types
+    Program, Block, Ident, Path, Visibility, Mutability,
+    // Expressions
+    Expr, ExprKind, Literal, BinOp, UnaryOp, BinaryExpr, UnaryExpr,
+    CallExpr, MethodCallExpr, FieldExpr, IndexExpr, IfExpr, MatchExpr,
+    MatchArm, Pattern, PatternKind, LoopExpr, WhileExpr, ForExpr,
+    AssignExpr, StructExpr, FieldInit, ClosureExpr, ClosureParam,
+    RefExpr, CastExpr, RangeExpr, FieldPattern,
+    // Statements
+    Stmt, StmtKind, LetStmt, ConstStmt,
+    // Items
+    Item, ItemKind, FnItem, FnParam, StructItem, StructKind, StructField,
+    TupleField, EnumItem, EnumVariant, VariantKind, TypeAliasItem,
+    TraitItem, TraitItemDef, TraitItemKind, ImplItem, ImplItemDef,
+    ImplItemKind, ModItem, UseItem, UseTree, UseTreeKind, ConstItem,
+    StaticItem, Generics, GenericParam, TypeBound, WhereClause, WherePredicate,
+    // Types
+    Type, TypeKind, GenericType, GenericArg, ArrayType, ReferenceType,
+    PointerType, FnType, QualifiedPathType, TraitObjectType, ImplTraitType,
+};
