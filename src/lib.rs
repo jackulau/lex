@@ -12,6 +12,8 @@
 //! - **Position Tracking**: Precise line and column numbers for all tokens
 //! - **Pluggable Languages**: Define custom keywords, operators, and comment styles
 //! - **Incremental Re-lexing**: Efficiently re-tokenize only changed regions
+//! - **Streaming Tokenization**: Memory-efficient processing for large inputs
+//! - **Token Caching**: LRU caching with fine-grained invalidation
 //! - **Zero Dependencies**: Core lexing uses only the standard library
 //! - **`no_std` Support**: Works in embedded environments with `alloc`
 //! - **WebAssembly Support**: Compile to WASM for browser-based tools
@@ -105,6 +107,45 @@
 //! println!("Reused {} tokens, lexed {} new", stats.tokens_reused, stats.tokens_lexed);
 //! assert_eq!(lexer.tokens().len(), 5);
 //! ```
+//!
+//! ## Streaming Tokenization
+//!
+//! For processing large files with minimal memory footprint:
+//!
+//! ```rust
+//! use lex::{StreamingLexer, DefaultLanguage};
+//!
+//! let mut lexer = StreamingLexer::new("let x = 42;", DefaultLanguage);
+//!
+//! // Process tokens one at a time
+//! while let Some(token) = lexer.next_token() {
+//!     println!("{:?}", token);
+//! }
+//!
+//! // Or use callback-based processing
+//! let mut lexer = StreamingLexer::new("let x = 42;", DefaultLanguage);
+//! lexer.process(|token| {
+//!     println!("{:?}", token);
+//!     true // continue processing
+//! });
+//! ```
+//!
+//! ## Token Caching with LRU Eviction
+//!
+//! For advanced caching with fine-grained invalidation:
+//!
+//! ```rust
+//! use lex::cache::{CachedLexer, CacheConfig};
+//! use lex::DefaultLanguage;
+//!
+//! let config = CacheConfig::default().max_versions(10);
+//! let mut lexer = CachedLexer::with_config("let x = 42;", DefaultLanguage, config);
+//!
+//! // Edit and see cache statistics
+//! lexer.edit(8, 10, "100");
+//! let stats = lexer.cache_stats();
+//! println!("Cache hit rate: {:.1}%", stats.hit_rate() * 100.0);
+//! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -113,11 +154,15 @@ extern crate alloc;
 
 pub mod error;
 #[cfg(feature = "alloc")]
+pub mod cache;
+#[cfg(feature = "alloc")]
 pub mod incremental;
 pub mod language;
 pub mod lexer;
 pub mod source;
 pub mod span;
+#[cfg(feature = "alloc")]
+pub mod streaming;
 pub mod token;
 pub mod unicode;
 
@@ -129,9 +174,16 @@ pub use error::{LexError, LexErrorKind};
 #[cfg(feature = "alloc")]
 pub use error::format_error_with_source;
 #[cfg(feature = "alloc")]
+pub use cache::{CachedLexer, CacheConfig, CacheStats, CacheVersion, TokenLruCache};
+#[cfg(feature = "alloc")]
 pub use incremental::{Edit, IncrementalLexer, IncrementalStats};
 pub use language::{DefaultLanguage, LanguageBuilder, LanguageSpec};
 pub use lexer::Lexer;
 pub use source::Source;
 pub use span::{Location, Span};
+#[cfg(feature = "alloc")]
+pub use streaming::{
+    BufferedTokenStream, ChunkedTokenizer, StreamingConfig, StreamingLexer,
+    StreamingStats, TokenVisitor,
+};
 pub use token::{KeywordId, Token, TokenKind};
